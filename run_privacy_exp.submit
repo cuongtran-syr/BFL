@@ -1,0 +1,16 @@
+############
+#
+# Example submit file for vanilla job
+#
+############
+getenv = True
+request_cpus = 1
+request_memory = 20 GB
+Universe       = vanilla
+Executable     = run_privacy_exp.sh
+Arguments      = $(d) $(m) $(s)
+input   = /dev/null
+output  = run_privacy_exp.out
+error   = run_privacy_exp.error
+log = run_privacy_exp.log
+Queue d,m,s from run_privacy_exp.in
