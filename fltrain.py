@@ -114,6 +114,7 @@ class TreeFL(BaseFL):
             curr_acc = eval(self.curr_model, self.test_loader)
             self.logs['val_acc'].append(curr_acc)
 
+
 class FedAvg(BaseFL):
   def __init__(self, configs = None):
         super().__init__( configs)
@@ -141,3 +142,11 @@ class FedAvg(BaseFL):
             curr_model = copy.deepcopy(agg_model)
             curr_acc = eval(self.curr_model, self.test_loader)
             self.logs['val_acc'].append(curr_acc)
+
+class RingFL(FedAvg):
+    def __init__(self, configs=None):
+        super().__init__(configs)
+        self.K = self.num_clients
+
+    def train(self):
+        super().train()
