@@ -12,6 +12,7 @@ class BaseFL(object):
             'K':50,
             'params': {}
         }
+        torch.manual_seed(0);
         self.curr_model = Net()
 
         if configs is not None:
