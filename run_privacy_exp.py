@@ -12,7 +12,7 @@ kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
 def run_exp(data, model_choice, seed):
 
-    file_name = file_path + '{}_bfl_{}_{}.pkl'.format(model_choice, data, seed)
+    file_name = file_path + '{}_bfl_{}_{}_private_sigma_0_5_C_20.pkl'.format(model_choice, data, seed)
     if model_choice == 'central':
         temp_bs = 64
     else:
@@ -46,7 +46,7 @@ def run_exp(data, model_choice, seed):
             ])),batch_size= 10000,  shuffle=True, **kwargs)
 
     default_params = {'lr':1.0, 'bs':64, 'gamma':0.90, 'epochs':1,
-                      'dp':True, 'delta':1e-5, 'sigma':1.0, 'C':20}
+                      'dp':True, 'delta':1e-5, 'sigma':0.5, 'C':20, 'device':'cpu'}
 
     logs = None
 
@@ -70,11 +70,11 @@ def run_exp(data, model_choice, seed):
             params[client_idx]['train_loader'] = None
 
         if model_choice =='chain':
-            fl_model = ChainFL(configs={'params': params, 'T': 40, 'B': 2, 'test_loader': test_loader})
+            fl_model = ChainFL(configs={'params': params, 'T': 40, 'B': 2, 'test_loader': test_loader, 'device':'cpu'})
         elif model_choice =='tree':
-            fl_model = ChainFL(configs={'params': params, 'T': 40, 'B': 2, 'test_loader': test_loader})
+            fl_model = ChainFL(configs={'params': params, 'T': 40, 'B': 2, 'test_loader': test_loader, 'device':'cpu'})
         else:
-            fl_model = FedAvg(configs={'params': params, 'T': 40, 'K': 50, 'test_loader': test_loader})
+            fl_model = RingFL(configs={'params': params, 'T': 40, 'K': 50, 'test_loader': test_loader, 'device':'cpu'})
 
         fl_model.train()
 

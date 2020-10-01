@@ -10,7 +10,8 @@ class BaseFL(object):
             'T': 30,  # num outer epochs 30-40
             'B': 2,  # branch size of tree,
             'K':50,
-            'params': {}
+            'params': {},
+            'device':'cpu'
         }
         torch.manual_seed(0);
         self.curr_model = Net()
@@ -115,7 +116,7 @@ class TreeFL(BaseFL):
             self.logs['val_acc'].append(curr_acc)
 
 
-class FedAvg(BaseFL):
+class RingFL(BaseFL):
   def __init__(self, configs = None):
         super().__init__( configs)
 
@@ -128,10 +129,9 @@ class FedAvg(BaseFL):
             shuffled_clts = super().shuffle_clients()
             total_samples = float( np.sum([ self.clients[clt].num_train_samples for clt in shuffled_clts[:self.K]]))
 
-            for clt in  shuffled_clts[:self.K]:
+            for clt in  shuffled_clts:
                 if t >=1 :
                     self.clients[clt].set_weights(curr_model)
-
                 self.clients[clt].train()
                 with torch.no_grad():
                     for ((agg_name, agg_para), (clt_name, clt_para)) in zip(agg_model.named_parameters(), self.clients[clt].model.named_parameters()):
@@ -140,13 +140,14 @@ class FedAvg(BaseFL):
 
             self.curr_model = copy.deepcopy(agg_model)
             curr_model = copy.deepcopy(agg_model)
-            curr_acc = eval(self.curr_model, self.test_loader)
+            curr_acc = eval(self.curr_model, self.test_loader, self.device)
+            print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
 
-class RingFL(FedAvg):
-    def __init__(self, configs=None):
-        super().__init__(configs)
-        self.K = self.num_clients
-
-    def train(self):
-        super().train()
+# class RingFL(FedAvg):
+#     def __init__(self, configs=None):
+#         super().__init__(configs)
+#         self.K = self.num_clients
+#
+#     def train(self):
+#         super().train()

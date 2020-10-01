@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from network import *
 
-def eval(model, test_loader):
+def eval(model, test_loader, device):
     """
     evaluation function -> similar to your test function 
     """
@@ -12,7 +12,8 @@ def eval(model, test_loader):
     with torch.no_grad():
         num_test_samples = 0
         for data, target in test_loader:
-            # data, target = data.to(device), target.to(device)
+            if device == 'cuda':
+              data, target = data.to('cuda'), target.to('cuda')
             output = model(data)
             test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability

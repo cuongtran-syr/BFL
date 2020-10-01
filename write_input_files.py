@@ -1,5 +1,5 @@
 dataset_list = [ 'MNIST','FMNIST']
-model_choice_list = ['central', 'chain', 'tree', 'fed-avg']
+model_choice_list = ['central', 'chain', 'tree', 'ring']
 file_ = open('run_privacy_exp.in', 'w')
 for dataset in dataset_list:
     for model_choice in model_choice_list:

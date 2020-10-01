@@ -70,7 +70,7 @@ class Agent_CLF(object):
             scheduler.step()
             self.lr = get_lr(optimizer)
             if self.fl_train is False:
-              curr_acc = eval(self.model, self.test_loader)
+              curr_acc = eval(self.model, self.test_loader, self.device)
               self.logs['val_acc'].append(copy.deepcopy(curr_acc))
 
 
