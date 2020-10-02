@@ -71,7 +71,7 @@ def run_exp(data, model_choice, sigma, K, seed):
     if model_choice == 'chain':
         fl_model = ChainFL(configs={'params': params, 'T': 15, 'B': 2, 'test_loader': test_loader, 'num_clients':K})
     elif model_choice == 'tree':
-        fl_model = ChainFL(configs={'params': params, 'T': 15, 'B': 2, 'test_loader': test_loader,'num_clients':K})
+        fl_model = TreeFL(configs={'params': params, 'T': 15, 'B': 2, 'test_loader': test_loader,'num_clients':K})
     else:
         fl_model = RingFL(configs={'params': params, 'T': 15, 'K': 100, 'test_loader': test_loader,'num_clients':K})
 
