@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+import random
 from network import *
 
 def eval(model, test_loader, device):
@@ -50,3 +51,53 @@ def clear_backprops(model: nn.Module) -> None:
     for layer in model.modules():
         if hasattr(layer, "backprops_list"):
             del layer.backprops_list
+
+
+
+def getDataSrc(train_loader):
+    """
+    Makure train_loader has mini-batch of 1
+    :param train_loader: 
+    :return: 
+    """
+    train_dataset = []
+
+    for batch_idx, (data, target) in enumerate(train_loader):
+        train_dataset.append([data, target])
+
+    return train_dataset
+
+
+def getBaisedDataset(dataSrc, deviceInd, deviceBatchSize, biasPer =0.3):
+
+    """
+    deviceBatchsize = trimSize = len(train_dataset)//device_cnt
+    :return: 
+    """
+
+    train_segmented = [[],[],[],[],[],[],[],[],[],[]]
+    deviceData = []
+    biasClass = random.randint(0,9)
+    totClass = 10
+
+    for idx, (data, target) in enumerate(dataSrc[deviceInd*deviceBatchSize:(deviceInd+1)*deviceBatchSize]):
+      train_segmented[target.tolist()[0]].append([data, target])
+
+
+
+    for ind in range(len(train_segmented)):
+      if (ind != biasClass):
+          l = len(train_segmented[ind]) - ((biasPer/(totClass-1))*len(train_segmented[ind]))
+          # print(ind, l, biasPer//(totClass-1))
+          train_segmented[ind] = train_segmented[ind][:int(l)]
+
+
+    for x in train_segmented:
+      deviceData += x
+
+    random.shuffle(deviceData)
+
+    x_train = torch.cat([x[0] for x in deviceData])
+    y_train =  torch.cat([x[1] for x in deviceData])
+
+    return x_train, y_train

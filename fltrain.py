@@ -7,13 +7,12 @@ class BaseFL(object):
     def __init__(self, configs=None):
         default_configs = {
             'num_clients': 100,
-            'T': 30,  # num outer epochs 30-40
+            'T': 20,  # num outer epochs 30-40
             'B': 2,  # branch size of tree,
             'K':50,
             'params': {},
             'device':'cpu'
         }
-        torch.manual_seed(0);
         self.curr_model = Net()
 
         if configs is not None:
@@ -64,8 +63,8 @@ class ChainFL(BaseFL):
                 self.clients[clt].train()
                 curr_model = copy.deepcopy(self.clients[clt].model)
 
-            #self.curr_model  = copy.deepcopy(curr_model)
-            curr_acc = eval(curr_model, self.test_loader)
+            curr_acc = eval(curr_model, self.test_loader, self.device)
+            print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
 
 
@@ -88,7 +87,6 @@ class TreeFL(BaseFL):
             shuffled_clts = super().shuffle_clients()
             print(shuffled_clts)
             for i, clt in enumerate(shuffled_clts):
-                print('process {}'.format(i))
                 parent_index = int(np.floor(
                     (i - 1) / self.B))  # get parent index of clt, check my write up, parent of a node i, is [(i-1)/B]
                 if parent_index >= 0:
@@ -112,9 +110,9 @@ class TreeFL(BaseFL):
             # self.set_weights(agg_model_dict)
             self.curr_model = copy.deepcopy(agg_model)
             curr_model = copy.deepcopy(agg_model)
-            curr_acc = eval(self.curr_model, self.test_loader)
+            curr_acc = eval(self.curr_model, self.test_loader, self.device)
+            print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
-
 
 class RingFL(BaseFL):
   def __init__(self, configs = None):
@@ -131,12 +129,12 @@ class RingFL(BaseFL):
 
             for clt in  shuffled_clts:
                 if t >=1 :
-                    self.clients[clt].set_weights(curr_model)
+                    self.clients[clt].model = copy.deepcopy(curr_model)
                 self.clients[clt].train()
                 with torch.no_grad():
                     for ((agg_name, agg_para), (clt_name, clt_para)) in zip(agg_model.named_parameters(), self.clients[clt].model.named_parameters()):
                         if agg_name == clt_name:
-                            agg_para += clt_para * self.clients[clt].num_train_samples/total_samples
+                            agg_para += clt_para/self.num_clients
 
             self.curr_model = copy.deepcopy(agg_model)
             curr_model = copy.deepcopy(agg_model)
@@ -144,10 +142,3 @@ class RingFL(BaseFL):
             print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
 
-# class RingFL(FedAvg):
-#     def __init__(self, configs=None):
-#         super().__init__(configs)
-#         self.K = self.num_clients
-#
-#     def train(self):
-#         super().train()

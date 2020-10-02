@@ -37,8 +37,9 @@ class Agent_CLF(object):
         """
         train/update the curr model of the agent
         """
-        optimizer = optim.Adadelta(self.model.parameters(), lr=self.lr)
-        scheduler = StepLR(optimizer, step_size=1, gamma=self.gamma)
+        #optimizer = optim.Adadelta(self.model.parameters(), lr=self.lr)
+        optimizer = optim.Adam(self.model.parameters(), 1e-3, )
+        #scheduler = StepLR(optimizer, step_size=1, gamma=self.gamma)
         if self.dp:
             self.model.zero_grad()
             optimizer.zero_grad()
@@ -53,9 +54,13 @@ class Agent_CLF(object):
                 max_grad_norm=self.C)
             privacy_engine.attach(optimizer)
 
+        if self.device =='cuda':
+          self.model.to('cuda')
         self.model.train()
         for _ in range(self.epochs):
             for batch_idx, (data, target) in enumerate(self.train_loader):
+                if self.device  =='cuda':
+                   data, target = data.to('cuda'), target.to('cuda')
                 optimizer.zero_grad()
                 output = self.model(data)
                 loss = F.nll_loss(output, target)
@@ -63,14 +68,8 @@ class Agent_CLF(object):
                 optimizer.step()
                 self.logs['train_loss'].append(copy.deepcopy(loss.item()))
 
-                if self.dp:
-                    epsilon, best_alpha = optimizer.privacy_engine.get_privacy_spent(self.delta)
-                    self.logs['eps'].append(epsilon)
-
-            scheduler.step()
+            #scheduler.step()
             self.lr = get_lr(optimizer)
             if self.fl_train is False:
               curr_acc = eval(self.model, self.test_loader, self.device)
               self.logs['val_acc'].append(copy.deepcopy(curr_acc))
-
-
