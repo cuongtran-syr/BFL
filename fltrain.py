@@ -9,9 +9,9 @@ class BaseFL(object):
             'num_clients': 100,
             'T': 20,  # num outer epochs 30-40
             'B': 2,  # branch size of tree,
-            'K':50,
+            'K': 50,
             'params': {},
-            'device':'cpu'
+            'device': 'cpu'
         }
         self.curr_model = Net()
 
@@ -80,9 +80,7 @@ class TreeFL(BaseFL):
     def train(self):
 
         for t in range(self.T):
-            agg_model = Net()
-            for name, para in agg_model.named_parameters():
-                para = torch.zeros(para.shape)
+            model_list = []
 
             shuffled_clts = super().shuffle_clients()
             print(shuffled_clts)
@@ -90,7 +88,7 @@ class TreeFL(BaseFL):
                 parent_index = int(np.floor(
                     (i - 1) / self.B))  # get parent index of clt, check my write up, parent of a node i, is [(i-1)/B]
                 if parent_index >= 0:
-                    parent_model = copy.deepcopy( self.clients[shuffled_clts[parent_index]].model)
+                    parent_model = copy.deepcopy(self.clients[shuffled_clts[parent_index]].model)
                     self.clients[clt].set_weights(parent_model)
                 else:
                     if t >= 1:
@@ -99,46 +97,55 @@ class TreeFL(BaseFL):
                 self.clients[clt].train()
 
                 if i >= self.index_leaf:
+                    model_list.append(self.clients[clt].model.named_parameters())
+
                     # aggregation step applied for leave nodes
-                    with torch.no_grad():
-                        for ((agg_name, agg_para), (clt_name, clt_para)) in zip(agg_model.named_parameters(),
-                                                                                self.clients[
-                                                                                    clt].model.named_parameters()):
-                            if agg_name == clt_name:
-                                agg_para += clt_para / self.num_leaves
+            with torch.no_grad():
+                global_params = {}
+                for param in model_list[0]:
+                    param_data = model_list[0][param].data
+                    for model_state in model_list[1:]:
+                        param_data += model_state[param].data
+                    param_data /= len(model_list)
+                    global_params[param] = param_data
 
             # self.set_weights(agg_model_dict)
-            self.curr_model = copy.deepcopy(agg_model)
-            curr_model = copy.deepcopy(agg_model)
+            curr_model = Net()
+            curr_model.load_state_dict(global_params)
+            self.curr_model = copy.deepcopy(curr_model)
             curr_acc = eval(self.curr_model, self.test_loader, self.device)
             print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
+
 
 class RingFL(BaseFL):
-  def __init__(self, configs = None):
-        super().__init__( configs)
+    def __init__(self, configs=None):
+        super().__init__(configs)
 
-  def train(self):
+    def train(self):
         for t in range(self.T):
-            agg_model = Net()
-            for name, para in agg_model.named_parameters():
-                para = torch.zeros(para.shape)
-
+            model_list = []
             shuffled_clts = super().shuffle_clients()
-            total_samples = float( np.sum([ self.clients[clt].num_train_samples for clt in shuffled_clts[:self.K]]))
-
-            for clt in  shuffled_clts:
-                if t >=1 :
+            for clt in shuffled_clts:
+                if t >= 1:
                     self.clients[clt].model = copy.deepcopy(curr_model)
                 self.clients[clt].train()
-                with torch.no_grad():
-                    for ((agg_name, agg_para), (clt_name, clt_para)) in zip(agg_model.named_parameters(), self.clients[clt].model.named_parameters()):
-                        if agg_name == clt_name:
-                            agg_para += clt_para/self.num_clients
+                model_list.append(dict(self.clients[clt].model.named_parameters()))
 
-            self.curr_model = copy.deepcopy(agg_model)
-            curr_model = copy.deepcopy(agg_model)
+            with torch.no_grad():
+                global_params = {}
+                for param in model_list[0]:
+                    param_data = model_list[0][param].data
+                    for model_state in model_list[1:]:
+                        param_data += model_state[param].data
+                    param_data /= len(model_list)
+                    global_params[param] = param_data
+
+            curr_model = Net()
+            curr_model.load_state_dict(global_params)
+            self.curr_model = copy.deepcopy(curr_model)
             curr_acc = eval(self.curr_model, self.test_loader, self.device)
             print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
+
 
