@@ -19,7 +19,7 @@ def run_exp(data, model_choice, sigma, K, seed):
         temp_bs = 2400
 
     default_params = {'lr': 1.0, 'bs': 64, 'gamma': 0.70, 'epochs': 1, 'fl_train': True, 'num_clients': K,
-                      'dp': True, 'delta': 1e-5, 'sigma': sigma, 'C': 20, 'device': 'cpu'}
+                      'dp': True, 'delta': 1e-5, 'sigma': sigma, 'C': 20, 'device': 'cpu', 'fed_avg':False}
 
     if data == 'biased_MNIST':
         train_loader = torch.utils.data.DataLoader(
@@ -75,22 +75,37 @@ def run_exp(data, model_choice, sigma, K, seed):
             params[client_idx]['x_train'] = x_train
             params[client_idx]['y_train'] = y_train
             params[client_idx]['train_loader'] = None
+            if model_choice =='fedavg':
+                params[client_idx]['fed_avg'] = True
+
+
     else:
 
         for client_idx in range(K):
             params[client_idx] = copy.deepcopy(default_params)
             x_train, y_train = getBaisedDataset(train_dataset,  client_idx, trimSize, biasPer =0.3)
-
             params[client_idx]['x_train'] = x_train
             params[client_idx]['y_train'] = y_train
             params[client_idx]['train_loader'] = None
+            if model_choice == 'fedavg':
+                params[client_idx]['fed_avg'] = True
+
+    num_outer_epochs = 15
+    num_iters = np.min([ len(params[client_idx]['x_train']) for client_idx in range(K)])//64
 
     if model_choice == 'chain':
-        fl_model = ChainFL(configs={'params': params, 'T': 10, 'B': 2, 'test_loader': test_loader, 'num_clients':K})
+        fl_model = ChainFL(
+            configs={'params': params, 'T': num_outer_epochs, 'B': 2, 'test_loader': test_loader, 'num_clients': K})
     elif model_choice == 'tree':
-        fl_model = TreeFL(configs={'params': params, 'T': 10, 'B': 2, 'test_loader': test_loader,'num_clients':K})
+        fl_model = TreeFL(
+            configs={'params': params, 'T': num_outer_epochs, 'B': 2, 'test_loader': test_loader, 'num_clients': K})
+    elif model_choice == 'ring':
+        fl_model = RingFL(
+            configs={'params': params, 'T': num_outer_epochs, 'K': 100, 'test_loader': test_loader, 'num_clients': K})
     else:
-        fl_model = RingFL(configs={'params': params, 'T': 10, 'K': 100, 'test_loader': test_loader,'num_clients':K})
+        num_rounds = int(num_outer_epochs * num_iters)
+        fl_model = FedAvg(configs={'params': params, 'T': num_rounds, 'test_loader': test_loader, 'num_clients': K})
+
 
     fl_model.train()
 

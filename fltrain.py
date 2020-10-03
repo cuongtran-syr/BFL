@@ -9,11 +9,11 @@ class BaseFL(object):
             'num_clients': 100,
             'T': 20,  # num outer epochs 30-40
             'B': 2,  # branch size of tree,
-            'K': 50,
             'params': {},
             'device': 'cpu'
         }
         self.curr_model = Net()
+        self.R = self.num_clients/2.0
 
         if configs is not None:
             default_configs.update(configs)
@@ -97,7 +97,7 @@ class TreeFL(BaseFL):
                 self.clients[clt].train()
 
                 if i >= self.index_leaf:
-                    model_list.append(self.clients[clt].model.named_parameters())
+                    model_list.append(dict(self.clients[clt].model.named_parameters()))
 
                     # aggregation step applied for leave nodes
             with torch.no_grad():
@@ -127,6 +127,38 @@ class RingFL(BaseFL):
             model_list = []
             shuffled_clts = super().shuffle_clients()
             for clt in shuffled_clts:
+                if t >= 1:
+                    self.clients[clt].model = copy.deepcopy(curr_model)
+                self.clients[clt].train()
+                model_list.append(dict(self.clients[clt].model.named_parameters()))
+
+            with torch.no_grad():
+                global_params = {}
+                for param in model_list[0]:
+                    param_data = model_list[0][param].data
+                    for model_state in model_list[1:]:
+                        param_data += model_state[param].data
+                    param_data /= len(model_list)
+                    global_params[param] = param_data
+
+            curr_model = Net()
+            curr_model.load_state_dict(global_params)
+            self.curr_model = copy.deepcopy(curr_model)
+            curr_acc = eval(self.curr_model, self.test_loader, self.device)
+            print(curr_acc)
+            self.logs['val_acc'].append(curr_acc)
+
+
+
+class FedAvg(BaseFL):
+    def __init__(self, configs=None):
+        super().__init__(configs)
+
+    def train(self):
+        for t in range(self.T):
+            model_list = []
+            shuffled_clts = super().shuffle_clients()
+            for clt in shuffled_clts[:self.R]:
                 if t >= 1:
                     self.clients[clt].model = copy.deepcopy(curr_model)
                 self.clients[clt].train()
