@@ -13,7 +13,7 @@ class BaseFL(object):
             'device': 'cpu'
         }
         self.curr_model = Net()
-        self.R = self.num_clients/2.0
+
 
         if configs is not None:
             default_configs.update(configs)
@@ -61,7 +61,9 @@ class ChainFL(BaseFL):
                 if curr_model is not None:
                     self.clients[clt].set_weights(curr_model)
                 self.clients[clt].train()
-                curr_model = copy.deepcopy(self.clients[clt].model)
+                curr_model_dict = self.clients[clt].get_weights()
+                curr_model = Net()
+                curr_model.load_state_dict(curr_model_dict)
 
             curr_acc = eval(curr_model, self.test_loader, self.device)
             print(curr_acc)
@@ -88,8 +90,9 @@ class TreeFL(BaseFL):
                 parent_index = int(np.floor(
                     (i - 1) / self.B))  # get parent index of clt, check my write up, parent of a node i, is [(i-1)/B]
                 if parent_index >= 0:
-                    parent_model = copy.deepcopy(self.clients[shuffled_clts[parent_index]].model)
-                    self.clients[clt].set_weights(parent_model)
+                    parent_model_dict =  self.clients[shuffled_clts[parent_index]].get_weights()
+                    self.clients[clt].model = Net()
+                    self.clients[clt].model.load_state_dict(parent_model_dict)
                 else:
                     if t >= 1:
                         self.clients[clt].model = copy.deepcopy(curr_model)
@@ -153,6 +156,7 @@ class RingFL(BaseFL):
 class FedAvg(BaseFL):
     def __init__(self, configs=None):
         super().__init__(configs)
+        self.R = self.num_clients // 2
 
     def train(self):
         for t in range(self.T):

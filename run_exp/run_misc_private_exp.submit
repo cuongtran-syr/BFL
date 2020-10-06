@@ -5,12 +5,12 @@
 ############
 getenv = True
 request_cpus = 1
-request_memory = 15 GB
+request_memory = 20 GB
 Universe       = vanilla
 Executable     = run_misc_private_exp.sh
 Arguments      = $(d) $(m) $(s) $(k) $(t)
 input   = /dev/null
 output  = run_misc_private_exp.out
 error   = run_misc_private_exp.error
-log = run_misc_private_exp.log
+log = run_privacy_exp.log
 Queue d,m,s,k,t from run_misc_private_exp.in

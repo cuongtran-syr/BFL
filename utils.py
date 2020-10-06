@@ -2,6 +2,39 @@ import torch.nn as nn
 import torch
 import random
 from network import *
+from keras.preprocessing.image import ImageDataGenerator
+
+def get_augmented_data(train_loader, device):
+
+    datagen = ImageDataGenerator(
+        rotation_range=10,
+        zoom_range=0.10,
+        width_shift_range=0.1,
+        height_shift_range=0.1)
+
+    train_dataset = []
+
+    for batch_idx, (data, target) in (enumerate(train_loader)):
+        train_dataset.append([data, target])
+        #print(type(target))
+        for _ in range(4):
+            if device == 'cuda':
+                data_aug_x, data_aug_y = datagen.flow(data.reshape((1, 28, 28, 1)).cpu().numpy(), target.cpu().numpy()).next()
+            else:
+                data_aug_x, data_aug_y = datagen.flow(data.reshape((1, 28, 28, 1)), target).next()
+
+            train_dataset.append([data_aug_x.reshape((1, 1, 28, 28)), target])
+
+    random.shuffle(train_dataset)
+
+    x_train = torch.cat([torch.FloatTensor(x[0]) for x in train_dataset])
+    y_train = torch.cat([x[1] for x in train_dataset])
+
+
+    return x_train, y_train
+
+
+
 
 def eval(model, test_loader, device):
     """
@@ -10,6 +43,8 @@ def eval(model, test_loader, device):
     model.eval()
     test_loss = 0
     correct = 0
+    if device =='cuda':
+        model.to('cuda')
     with torch.no_grad():
         num_test_samples = 0
         for data, target in test_loader:

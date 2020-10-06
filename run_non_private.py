@@ -6,10 +6,12 @@ data_path = '/home/cutran/Documents/federated_learning/data/'
 
 
 
-def run_exp(data, model_choice, sigma, K, seed):
-    file_name = file_path + '{}_bfl_{}_{}_private_sigma_{}_K_{}_C20_.pkl'.format(model_choice, data, sigma, K, seed)
-
-    bs = 64
+def run_exp(data, model_choice, augment, bs,  K, seed):
+    file_name = file_path + 'non_private_data_{}_{}_{}_{}_{}_{}.pkl'.format(model_choice, data, augment, bs, K, seed)
+    if augment ==1:
+        augmented = True
+    else:
+        augmented = False
 
     if K == 10:
         temp_bs = 6000
@@ -45,8 +47,8 @@ def run_exp(data, model_choice, sigma, K, seed):
                 transforms.Normalize((0.1307,), (0.3081,))
             ])), batch_size=10000, shuffle=True)
 
-    default_params = {'lr': 1.0,'augmented':False, 'bs': bs, 'gamma': 0.70, 'epochs': 1, 'fl_train':True,'num_clients':K,
-                      'dp': True, 'delta': 1e-5, 'sigma': sigma, 'C': 20, 'device': 'cpu','fed_avg':False}
+    default_params = {'lr': 1.0,'augmented':augmented, 'bs': bs, 'gamma': 0.70, 'epochs': 1, 'fl_train':True,'num_clients':K,
+                      'dp': False, 'delta': 1e-5, 'sigma': 0.2, 'C': 20, 'device': 'cpu','fed_avg':False}
 
 
     params = {}
@@ -87,11 +89,12 @@ def main():
    parser = argparse.ArgumentParser(description='Test')
    parser.add_argument('--model_choice', default='ring', type=str)
    parser.add_argument('--data', default='MNIST', type=str)
-   parser.add_argument('--sigma', default= 0.5, type=float)
+   parser.add_argument('--augment', default= 0, type=int)
+   parser.add_argument('--bs', default=16, type=int)
    parser.add_argument('--K', default=10, type=int)
    parser.add_argument('--seed', default=0, type=int)
    args = parser.parse_args()
-   run_exp( args.data, args.model_choice,  args.sigma, args.K, args.seed)
+   run_exp( args.data, args.model_choice,  args.augment, args.bs, args.K, args.seed)
    print('That took {} seconds'.format(time.time() - starttime))
 
 if __name__ == "__main__":

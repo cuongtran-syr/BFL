@@ -1,0 +1,16 @@
+############
+#
+# Example submit file for vanilla job
+#
+############
+getenv = True
+request_cpus = 1
+request_memory = 10 GB
+Universe       = vanilla
+Executable     = run_non_private.sh
+Arguments      = $(d) $(m) $(a) $(b) $(k) $(t)
+input   = /dev/null
+output  = run_non_private.out
+error   = run_non_private.error
+log = run_non_private.log
+Queue d,m,a,b,k,t from run_non_private.in
