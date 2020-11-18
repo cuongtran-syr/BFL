@@ -2,7 +2,32 @@ import torch.nn as nn
 import torch
 import random
 from network import *
+import torchvision
 from keras.preprocessing.image import ImageDataGenerator
+from sklearn.metrics import confusion_matrix
+
+def get_covid_model():
+    model_conv = torchvision.models.resnet18(pretrained=True)
+    for param in model_conv.parameters():
+      param.requires_grad = False
+    num_ftrs = model_conv.fc.in_features
+    model_conv.fc = nn.Linear(num_ftrs, 2)
+
+    return model_conv
+
+
+def get_metrics(y_true, y_pred):
+    cm = confusion_matrix(y_true.argmax(axis=1), y_pred)
+    total = sum(sum(cm))
+    if (len(cm[0]) > 1):
+        acc = (cm[0, 0] + cm[1, 1]) / total
+        sensitivity = cm[0, 0] / (cm[0, 0] + cm[0, 1])
+        specificity = cm[1, 1] / (cm[1, 0] + cm[1, 1])
+    else:
+        acc = (cm[0, 0]) / total
+        sensitivity = 1
+        specificity = 1
+    return acc, sensitivity, specificity
 
 def get_augmented_data(train_loader, device):
 

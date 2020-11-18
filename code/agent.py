@@ -52,8 +52,9 @@ class Agent_CLF(object):
         """
         train/update the curr model of the agent
         """
-        optimizer = optim.Adadelta(self.model.parameters(), lr=self.lr)
-        scheduler = StepLR(optimizer, step_size=1, gamma=self.gamma)
+        #optimizer = optim.Adadelta(self.model.parameters(), lr=self.lr)
+        optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
+        #scheduler = StepLR(optimizer, step_size=1, gamma=self.gamma)
         if self.dp:
             self.model.zero_grad()
             optimizer.zero_grad()
@@ -73,16 +74,11 @@ class Agent_CLF(object):
         self.model.train()
         for _ in range(self.epochs):
             num_batches = len(self.train_loader)
-            start, end = 0, num_batches
+            default_list = list(range(num_batches))
             if self.fed_avg:
-                start, end = self.random_idx,  self.random_idx +1
-                self.random_idx += 1
-                if self.random_idx >= num_batches:
-                    self.random_idx = 0
-
-
+                default_list = np.random.choice(default_list, 1,  replace = False)
             for batch_idx, (data, target) in enumerate(self.train_loader):
-                if start <= batch_idx < end:
+                if batch_idx in default_list:
                     if self.device == 'cuda':
                         data, target = data.to('cuda'), target.to('cuda')
                     optimizer.zero_grad()
@@ -92,8 +88,9 @@ class Agent_CLF(object):
                     optimizer.step()
                     self.logs['train_loss'].append(copy.deepcopy(loss.item()))
 
-            scheduler.step()
+            #scheduler.step()
             self.lr = get_lr(optimizer)
             if self.fl_train is False:
                 curr_acc = eval(self.model, self.test_loader, self.device)
                 self.logs['val_acc'].append(copy.deepcopy(curr_acc))
+

@@ -25,7 +25,7 @@ class BaseFL(object):
             setattr(self, key, val)
 
         self.clients = [Agent_CLF(self.params[i]) for i in range(self.num_clients)]
-        self.logs = {'val_acc': []}
+        self.logs = {'val_acc': [], 'val_acc_iter':[]}
 
     def shuffle_clients(self):
         return np.random.permutation(self.num_clients)
@@ -46,6 +46,22 @@ class BaseFL(object):
             w_dict[name] = copy.deepcopy(param)
         return w_dict
 
+    def agg_model(self, model_list, start, end ):
+        with torch.no_grad():
+            global_params = {}
+            for param in model_list[start]:
+                param_data = model_list[start][param].data
+                num_ = 1.0
+                for model_state in model_list[start+1:end]:
+                    param_data += model_state[param].data
+                    num_ += 1.0
+                param_data /= num_
+                global_params[param] = param_data
+
+        return global_params
+
+
+
 
 class ChainFL(BaseFL):
     # extend the base federated learning class for chain topology
@@ -64,6 +80,8 @@ class ChainFL(BaseFL):
                 curr_model_dict = self.clients[clt].get_weights()
                 curr_model = Net()
                 curr_model.load_state_dict(curr_model_dict)
+                curr_acc = eval(curr_model, self.test_loader, self.device)
+                self.logs['val_acc_iter'].append(copy.deepcopy(curr_acc))
 
             curr_acc = eval(curr_model, self.test_loader, self.device)
             print(curr_acc)
@@ -78,6 +96,7 @@ class TreeFL(BaseFL):
             0]  # height of tree
         self.index_leaf = (self.B ** (self.h - 1) - 1) / (self.B - 1) + 1
         self.num_leaves = float(self.num_clients - self.index_leaf + 1)
+        self.index_level = [int( (self.B ** (i - 1) - 1) / (self.B - 1))   for i in range(1, self.h +1)]
 
     def train(self):
 
@@ -99,26 +118,22 @@ class TreeFL(BaseFL):
 
                 self.clients[clt].train()
 
-                if i >= self.index_leaf:
-                    model_list.append(dict(self.clients[clt].model.named_parameters()))
 
-                    # aggregation step applied for leave nodes
-            with torch.no_grad():
-                global_params = {}
-                for param in model_list[0]:
-                    param_data = model_list[0][param].data
-                    for model_state in model_list[1:]:
-                        param_data += model_state[param].data
-                    param_data /= len(model_list)
-                    global_params[param] = param_data
+                model_list.append(dict(self.clients[clt].model.named_parameters()))
 
-            # self.set_weights(agg_model_dict)
-            curr_model = Net()
-            curr_model.load_state_dict(global_params)
+
+            for (start, end) in  zip(self.index_level [:-1], self.index_level[1:]):
+                global_params = self.agg_model(model_list, start, end )
+                curr_model = Net()
+                curr_model.load_state_dict(global_params)
+                curr_acc = eval(curr_model, self.test_loader, self.device)
+
+                self.logs['val_acc_iter'].append(curr_acc)
+
             self.curr_model = copy.deepcopy(curr_model)
-            curr_acc = eval(self.curr_model, self.test_loader, self.device)
             print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
+
 
 
 class RingFL(BaseFL):
@@ -135,21 +150,13 @@ class RingFL(BaseFL):
                 self.clients[clt].train()
                 model_list.append(dict(self.clients[clt].model.named_parameters()))
 
-            with torch.no_grad():
-                global_params = {}
-                for param in model_list[0]:
-                    param_data = model_list[0][param].data
-                    for model_state in model_list[1:]:
-                        param_data += model_state[param].data
-                    param_data /= len(model_list)
-                    global_params[param] = param_data
-
+            global_params = self.agg_model(model_list, 0, len(model_list))
             curr_model = Net()
             curr_model.load_state_dict(global_params)
             self.curr_model = copy.deepcopy(curr_model)
             curr_acc = eval(self.curr_model, self.test_loader, self.device)
-            print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
+            self.logs['val_acc_iter'].append(curr_acc)
 
 
 
@@ -157,6 +164,9 @@ class FedAvg(BaseFL):
     def __init__(self, configs=None):
         super().__init__(configs)
         self.R = self.num_clients // 2
+        for clt_idx in range(self.num_clients):
+            self.clients[clt_idx].fed_avg = True
+
 
     def train(self):
         for t in range(self.T):
@@ -168,14 +178,7 @@ class FedAvg(BaseFL):
                 self.clients[clt].train()
                 model_list.append(dict(self.clients[clt].model.named_parameters()))
 
-            with torch.no_grad():
-                global_params = {}
-                for param in model_list[0]:
-                    param_data = model_list[0][param].data
-                    for model_state in model_list[1:]:
-                        param_data += model_state[param].data
-                    param_data /= len(model_list)
-                    global_params[param] = param_data
+            global_params = self.agg_model(model_list, 0, len(model_list))
 
             curr_model = Net()
             curr_model.load_state_dict(global_params)
@@ -183,5 +186,35 @@ class FedAvg(BaseFL):
             curr_acc = eval(self.curr_model, self.test_loader, self.device)
             print(curr_acc)
             self.logs['val_acc'].append(curr_acc)
+            self.logs['val_acc_iter'].append(curr_acc)
 
+
+class NewFedAvg(BaseFL):
+    def __init__(self, configs=None):
+        super().__init__(configs)
+        self.R = self.num_clients // 5
+
+        for clt_idx in range(self.num_clients):
+            self.clients[clt_idx].fed_avg = False
+
+
+    def train(self):
+        for t in range(self.T):
+            model_list = []
+            shuffled_clts = super().shuffle_clients()
+            for clt in shuffled_clts[:self.R]:
+                if t >= 1:
+                    self.clients[clt].model = copy.deepcopy(curr_model)
+                self.clients[clt].train()
+                model_list.append(dict(self.clients[clt].model.named_parameters()))
+
+            global_params = self.agg_model(model_list, 0, len(model_list))
+
+            curr_model = Net()
+            curr_model.load_state_dict(global_params)
+            self.curr_model = copy.deepcopy(curr_model)
+            curr_acc = eval(self.curr_model, self.test_loader, self.device)
+            print(curr_acc)
+            self.logs['val_acc'].append(curr_acc)
+            self.logs['val_acc_iter'].append(curr_acc)
 

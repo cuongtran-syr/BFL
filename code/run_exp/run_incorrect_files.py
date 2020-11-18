@@ -5,7 +5,7 @@ from utils import *
 from network import *
 import pickle
 import argparse, time
-file_path = '/home/cutran/Documents/federated_learning/res3/'
+file_path = '/home/cutran/Documents/federated_learning/res4/'
 data_path = '/home/cutran/Documents/federated_learning/data/'
 
 def run_exp(data, model_choice, sigma, K, seed):
@@ -19,6 +19,8 @@ def run_exp(data, model_choice, sigma, K, seed):
         temp_bs = 600
     else:
         temp_bs = 1200
+
+
     if data == 'MNIST':
         train_loader = torch.utils.data.DataLoader(
             datasets.MNIST(data_path, train=True, download=False,
@@ -47,7 +49,7 @@ def run_exp(data, model_choice, sigma, K, seed):
                 transforms.Normalize((0.1307,), (0.3081,))
             ])), batch_size=10000, shuffle=True)
 
-    default_params = {'lr': 1.0, 'augmented':True,'bs': bs, 'gamma': 0.70, 'epochs': 1, 'fl_train':True,'num_clients':K,
+    default_params = {'lr': 1.0, 'augmented':False,'bs': bs, 'gamma': 0.70, 'epochs': 1, 'fl_train':True,'num_clients':K,
                       'dp': True, 'delta': 1e-5, 'sigma': sigma, 'C': 20, 'device': 'cpu','fed_avg':False}
 
 
@@ -72,22 +74,28 @@ def run_exp(data, model_choice, sigma, K, seed):
     elif model_choice == 'ring':
         fl_model = RingFL(
             configs={'params': params, 'T': num_outer_epochs, 'K': 100, 'test_loader': test_loader, 'num_clients': K})
-    else:
+    elif model_choice =='fedavg':
         num_rounds = int(num_outer_epochs * num_iters)
         fl_model = FedAvg(configs={'params': params, 'T': num_rounds, 'test_loader': test_loader, 'num_clients': K})
+    else:
+        fl_model = NewFedAvg(configs={'params': params, 'T': num_outer_epochs, 'test_loader': test_loader, 'num_clients': K})
+
 
     fl_model.train()
 
-    logs = fl_model.logs['val_acc']
+    res ={}
+    res['val_acc'] = copy.deepcopy(fl_model.logs['val_acc'])
+    res['val_acc_iter'] = copy.deepcopy(fl_model.logs['val_acc_iter'])
+
 
     file_handle = open(file_name, 'wb')
-    pickle.dump(logs, file_handle)
+    pickle.dump(res, file_handle)
 
 
 def main():
    starttime = time.time()
    parser = argparse.ArgumentParser(description='Test')
-   parser.add_argument('--model_choice', default='ring', type=str)
+   parser.add_argument('--model_choice', default='newfedavg', type=str)
    parser.add_argument('--data', default='MNIST', type=str)
    parser.add_argument('--sigma', default= 0.5, type=float)
    parser.add_argument('--K', default=10, type=int)

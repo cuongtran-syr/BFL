@@ -1,0 +1,16 @@
+############
+#
+# Example submit file for vanilla job
+#
+############
+getenv = True
+request_cpus = 1
+request_memory = 20 GB
+Universe       = vanilla
+Executable     = run_covid_privacy.sh
+Arguments      = $(m) $(s) $(k) $(t)
+input   = /dev/null
+output  = run_covid_privacy.out
+error   = run_covid_privacy.error
+log = run_covid_privacyp.log
+Queue m,s,k,t from run_covid_privacy.in
