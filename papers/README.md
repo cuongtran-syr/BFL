@@ -1,4 +1,3 @@
-if
 ## A Federated Learning library that attempts to align with this publication categorization : FedML: https://fedml.ai
 
 # Awesome-Federated-Learning [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
